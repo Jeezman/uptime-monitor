@@ -3,13 +3,15 @@ var environments = {};
 environments.staging = {
   httpPort: 3000,
   httpsPort: 3001,
-  env: 'staging'
+  env: 'staging',
+  hashingSecret: 'thisIsAWillyMightySecret'
 };
 
 environments.production = {
   httpPort: 5000,
   httpsPort: 5001,
-  env: 'production'
+  env: 'production',
+  hashingSecret: 'thisIsAWillyMightySecret'
 };
 
 var currentEnvironment =
