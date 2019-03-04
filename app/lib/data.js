@@ -4,6 +4,7 @@
 
 var fs = require('fs');
 var path = require('path');
+var helpers = require('./helpers');
 
 var lib = {};
 
@@ -37,6 +38,10 @@ lib.create = function(dir, file, data, callback) {
 
 lib.read = function(dir, file, callback) {
   fs.readFile(`${lib.baseDir}${dir}/${file}.json`, 'utf8', function(err, data) {
+    if (!err && data) {
+      var parsedData = helpers.parseJsonToObject(data);
+      callback(false, parsedData);
+    }
     callback(err, data);
   });
 };
