@@ -171,6 +171,30 @@ handlers._users.put = function(data, callback) {
   }
 };
 
-handlers._users.delete = function(data, callback) {};
+handlers._users.delete = function(data, callback) {
+  var phone =
+    typeof data.queryStringObject.phone == 'string' &&
+    data.queryStringObject.phone.trim().length == 11
+      ? data.queryStringObject.phone.trim()
+      : false;
+
+  if (phone) {
+    _data.read('users', phone, function(err, data) {
+      if (!err && data) {
+        _data.delete('users', phone, function(err) {
+          if (!err) {
+            callback(200);
+          } else {
+            callback(500, { Error: 'Could not delete the specified user' });
+          }
+        });
+      } else {
+        callback(404, { Error: 'Could not find the specified user' });
+      }
+    });
+  } else {
+    callback(400, { Error: 'Missing required field' });
+  }
+};
 
 module.exports = handlers;
