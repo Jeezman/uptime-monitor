@@ -4,14 +4,16 @@ environments.staging = {
   httpPort: 3000,
   httpsPort: 3001,
   env: 'staging',
-  hashingSecret: 'thisIsAWillyMightySecret'
+  hashingSecret: 'thisIsAWillyMightySecret',
+  maxChecks: 5
 };
 
 environments.production = {
   httpPort: 5000,
   httpsPort: 5001,
   env: 'production',
-  hashingSecret: 'thisIsAWillyMightySecret'
+  hashingSecret: 'thisIsAWillyMightySecret',
+  maxChecks: 5
 };
 
 var currentEnvironment =

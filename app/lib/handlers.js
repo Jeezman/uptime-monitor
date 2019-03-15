@@ -4,6 +4,7 @@
 
 var _data = require('./data');
 var helpers = require('./helpers');
+var config = require('../config');
 
 var handlers = {};
 
@@ -393,6 +394,119 @@ handlers._tokens.verifyToken = function(id, phone, callback) {
       callback(false);
     }
   });
+};
+
+// check service
+handlers.checks = function(data, callback) {
+  var acceptableMethods = ['post', 'get', 'put', 'delete'];
+  if (acceptableMethods.indexOf(data.method) > -1) {
+    handlers._checks[data.method](data, callback);
+  } else {
+    callback(405);
+  }
+};
+
+handlers._checks = {};
+
+// required data: protocol, url, method, successCodes
+handlers._checks.post = function(data, callback) {
+  var protocol =
+    typeof data.payload.protocol == 'string' &&
+    ['https', 'http'].indexOf(data.payload.protocol) > -1
+      ? data.payload.protocol
+      : false;
+
+  var url =
+    typeof data.payload.url == 'string' && data.payload.url.trim().length > 0
+      ? data.payload.url.trim()
+      : false;
+
+  var method =
+    typeof data.payload.method == 'string' &&
+    ['post', 'get', 'put', 'delete'].indexOf(data.payload.method) > -1
+      ? data.payload.method
+      : false;
+
+  var successCodes =
+    typeof data.payload.successCodes == 'object' &&
+    data.payload.successCodes instanceof Array &&
+    data.payload.successCodes.length > 0
+      ? data.payload.successCodes
+      : false;
+
+  var timeoutSeconds =
+    typeof data.payload.timeoutSeconds == 'number' &&
+    data.payload.timeoutSeconds % 1 === 0 &&
+    data.payload.timeoutSeconds >= 1 &&
+    data.payload.timeoutSeconds <= 5
+      ? data.payload.timeoutSeconds
+      : false;
+
+  if (protocol && url && method && successCodes && timeoutSeconds) {
+    var token =
+      typeof data.headers.token == 'string' ? data.headers.token : false;
+
+    _data.read('tokens', token, function(err, tokenData) {
+      if (!err && tokenData) {
+        var userPhone = tokenData.phone;
+
+        _data.read('users', userPhone, function(err, userData) {
+          if (!err && userData) {
+            var userChecks =
+              typeof userData.checks == 'object' &&
+              userData.checks instanceof Array
+                ? userData.checks
+                : [];
+
+            if (userChecks.length < config.maxChecks) {
+              var checkId = helpers.createRandomString(20);
+
+              var checkObject = {
+                id: checkId,
+                userPhone: userPhone,
+                protocol: protocol,
+                url: url,
+                method: method,
+                successCodes: successCodes,
+                timeoutSeconds: timeoutSeconds
+              };
+
+              _data.create('checks', checkId, checkObject, function(err) {
+                if (!err) {
+                  // add the check id to the user object
+                  userData.checks = userChecks;
+                  userData.checks.push(checkId);
+
+                  // save new user data
+                  _data.update('users', userPhone, userData, function(err) {
+                    if (!err) {
+                      callback(200, checkObject);
+                    } else {
+                      callback(500, {
+                        Error: 'Could not update the user with the new check'
+                      });
+                    }
+                  });
+                }
+              });
+            } else {
+              callback(400, {
+                Error: `The user already has the maximum number of checks ${
+                  config.maxChecks
+                } `
+              });
+            }
+          } else {
+            callback(403);
+          }
+        });
+      } else {
+        callback(403);
+      }
+    });
+  } else {
+    callback(400, { Error: 'Missing required inputs, or inputs are invalid' });
+  }
 };
 
 module.exports = handlers;
