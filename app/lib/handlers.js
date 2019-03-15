@@ -104,12 +104,25 @@ handlers._users.get = function(data, callback) {
       : false;
 
   if (phone) {
-    _data.read('users', phone, function(err, data) {
-      if (!err && data) {
-        delete data.hashedPassword;
-        callback(200, data);
+    // get token from headers
+    var token =
+      typeof data.headers.token == 'string' ? data.headers.token : false;
+
+    // verify token
+    handlers._tokens.verifyToken(token, phone, function(isTokenValid) {
+      if (isTokenValid) {
+        _data.read('users', phone, function(err, data) {
+          if (!err && data) {
+            delete data.hashedPassword;
+            callback(200, data);
+          } else {
+            callback(404);
+          }
+        });
       } else {
-        callback(404);
+        callback(403, {
+          Error: 'Missing required token in header, or token is invalid'
+        });
       }
     });
   } else {
@@ -143,29 +156,41 @@ handlers._users.put = function(data, callback) {
       : false;
 
   if (phone) {
-    if (firstName || lastName || password) {
-      _data.read('users', phone, function(err, userData) {
-        console.log('user data is ', userData);
-        if (!err && userData) {
-          if (firstName) userData.firstName = firstName;
-          if (lastName) userData.lastName = lastName;
-          if (password) userData.hashedPassword = helpers.hash(password);
+    var token =
+      typeof data.headers.token == 'string' ? data.headers.token : false;
 
-          _data.update('users', phone, userData, function(err) {
-            if (!err) {
-              callback(200);
+    // verify token
+    handlers._tokens.verifyToken(token, phone, function(isTokenValid) {
+      if (isTokenValid) {
+        if (firstName || lastName || password) {
+          _data.read('users', phone, function(err, userData) {
+            console.log('user data is ', userData);
+            if (!err && userData) {
+              if (firstName) userData.firstName = firstName;
+              if (lastName) userData.lastName = lastName;
+              if (password) userData.hashedPassword = helpers.hash(password);
+
+              _data.update('users', phone, userData, function(err) {
+                if (!err) {
+                  callback(200);
+                } else {
+                  console.log(err);
+                  callback(500, { Error: 'Could not update the user' });
+                }
+              });
             } else {
-              console.log(err);
-              callback(500, { Error: 'Could not update the user' });
+              callback(400, { Error: 'The specified user does not exist' });
             }
           });
         } else {
-          callback(400, { Error: 'The specified user does not exist' });
+          callback(400, { Error: 'Missing required fields to update' });
         }
-      });
-    } else {
-      callback(400, { Error: 'Missing required fields to update' });
-    }
+      } else {
+        callback(403, {
+          Error: 'Missing required token in header, or token is invalid'
+        });
+      }
+    });
   } else {
     callback(400, { Error: 'Missing required field' });
   }
@@ -179,17 +204,29 @@ handlers._users.delete = function(data, callback) {
       : false;
 
   if (phone) {
-    _data.read('users', phone, function(err, data) {
-      if (!err && data) {
-        _data.delete('users', phone, function(err) {
-          if (!err) {
-            callback(200);
+    var token =
+      typeof data.headers.token == 'string' ? data.headers.token : false;
+
+    // verify token
+    handlers._tokens.verifyToken(token, phone, function(isTokenValid) {
+      if (isTokenValid) {
+        _data.read('users', phone, function(err, data) {
+          if (!err && data) {
+            _data.delete('users', phone, function(err) {
+              if (!err) {
+                callback(200);
+              } else {
+                callback(500, { Error: 'Could not delete the specified user' });
+              }
+            });
           } else {
-            callback(500, { Error: 'Could not delete the specified user' });
+            callback(404, { Error: 'Could not find the specified user' });
           }
         });
       } else {
-        callback(404, { Error: 'Could not find the specified user' });
+        callback(403, {
+          Error: 'Missing required token in header, or token is invalid'
+        });
       }
     });
   } else {
@@ -342,6 +379,20 @@ handlers._tokens.put = function(data, callback) {
       Error: 'Missing required fields or required fields invalid'
     });
   }
+};
+
+handlers._tokens.verifyToken = function(id, phone, callback) {
+  _data.read('tokens', id, function(err, tokenData) {
+    if (!err && tokenData) {
+      if (tokenData.phone == phone && tokenData.expires > Date.now()) {
+        callback(true);
+      } else {
+        callback(false);
+      }
+    } else {
+      callback(false);
+    }
+  });
 };
 
 module.exports = handlers;
