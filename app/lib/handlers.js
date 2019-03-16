@@ -509,4 +509,34 @@ handlers._checks.post = function(data, callback) {
   }
 };
 
+handlers._checks.get = function(data, callback) {
+  var id =
+    typeof data.queryStringObject.id == 'string' &&
+    data.queryStringObject.id.trim().length == 20
+      ? data.queryStringObject.id.trim()
+      : false;
+
+  if (id) {
+    _data.read('checks', id, function(err, checkData) {
+      if (!err && checkData) {
+        var token =
+          typeof data.headers.token == 'string' ? data.headers.token : false;
+
+        handlers._tokens.verifyToken(token, checkData.userPhone, function(
+          isTokenValid
+        ) {
+          if (isTokenValid) {
+            callback(200, checkData);
+          } else {
+            callback(403);
+          }
+        });
+      } else {
+      }
+    });
+  } else {
+    callback(400, { Error: 'Missing required field' });
+  }
+};
+
 module.exports = handlers;
