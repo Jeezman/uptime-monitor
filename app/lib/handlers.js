@@ -539,4 +539,94 @@ handlers._checks.get = function(data, callback) {
   }
 };
 
+handlers._checks.put = function(data, callback) {
+  var id =
+    typeof data.payload.id == 'string' && data.payload.id.trim().length == 20
+      ? data.payload.id.trim()
+      : false;
+
+  var protocol =
+    typeof data.payload.protocol == 'string' &&
+    ['https', 'http'].indexOf(data.payload.protocol) > -1
+      ? data.payload.protocol
+      : false;
+
+  var url =
+    typeof data.payload.url == 'string' && data.payload.url.trim().length > 0
+      ? data.payload.url.trim()
+      : false;
+
+  var method =
+    typeof data.payload.method == 'string' &&
+    ['post', 'get', 'put', 'delete'].indexOf(data.payload.method) > -1
+      ? data.payload.method
+      : false;
+
+  var successCodes =
+    typeof data.payload.successCodes == 'object' &&
+    data.payload.successCodes instanceof Array &&
+    data.payload.successCodes.length > 0
+      ? data.payload.successCodes
+      : false;
+
+  var timeoutSeconds =
+    typeof data.payload.timeoutSeconds == 'number' &&
+    data.payload.timeoutSeconds % 1 === 0 &&
+    data.payload.timeoutSeconds >= 1 &&
+    data.payload.timeoutSeconds <= 5
+      ? data.payload.timeoutSeconds
+      : false;
+
+  if (id) {
+    if (protocol || url || method || successCodes || timeoutSeconds) {
+      _data.read('checks', id, function(err, checkData) {
+        if (!err && checkData) {
+          var token =
+            typeof data.headers.token == 'string' ? data.headers.token : false;
+          handlers._tokens.verifyToken(token, checkData.userPhone, function(
+            isTokenValid
+          ) {
+            if (isTokenValid) {
+              if (protocol) {
+                checkData.protocol = protocol;
+              }
+              if (url) {
+                checkData.url = url;
+              }
+              if (method) {
+                checkData.method = method;
+              }
+              if (successCodes) {
+                checkData.successCodes = successCodes;
+              }
+              if (timeoutSeconds) {
+                checkData.timeoutSeconds = timeoutSeconds;
+              }
+
+              // store the new updates
+              _data.update('checks', id, checkData, function(err) {
+                if (!err) {
+                  callback(200);
+                } else {
+                  callback(500, { Error: 'Could not update the user' });
+                }
+              });
+            } else {
+              callback(403, {
+                Error: 'Missing required token in header, or token is invalid'
+              });
+            }
+          });
+        } else {
+          callback(400, { Error: 'Check ID did not exist' });
+        }
+      });
+    } else {
+      callback(400, { Error: 'Missing fields to update' });
+    }
+  } else {
+    callback(400, { Error: 'Missing required field(s)' });
+  }
+};
+
 module.exports = handlers;
